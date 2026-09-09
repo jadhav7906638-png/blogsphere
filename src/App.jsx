@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import API from "./api";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
+import Login from "./pages/login";
+import Register from "./pages/register";
 import "./App.css";
 
 function App() {
