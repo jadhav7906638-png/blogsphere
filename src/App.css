@@ -1517,3 +1517,324 @@ button {
     display: none;
   }
 }
+
+/* ============================= */
+/* LOGIN + REGISTER AUTH PAGES   */
+/* ============================= */
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  position: relative;
+  overflow: hidden;
+
+  background:
+    radial-gradient(
+      circle at 15% 20%,
+      rgba(99, 102, 241, 0.25),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 85% 80%,
+      rgba(6, 182, 212, 0.18),
+      transparent 30%
+    ),
+    #0b1020;
+}
+
+/* Decorative background glow */
+
+.auth-page::before,
+.auth-page::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+}
+
+.auth-page::before {
+  width: 260px;
+  height: 260px;
+  background: #6366f1;
+  opacity: 0.16;
+  top: -80px;
+  left: -70px;
+}
+
+.auth-page::after {
+  width: 300px;
+  height: 300px;
+  background: #06b6d4;
+  opacity: 0.12;
+  bottom: -100px;
+  right: -80px;
+}
+
+/* Main card */
+
+.auth-card {
+  position: relative;
+  z-index: 2;
+
+  width: 100%;
+  max-width: 460px;
+
+  padding: 42px 40px;
+
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+
+  background: rgba(255, 255, 255, 0.08);
+
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  color: white;
+}
+
+/* Logo / A */
+
+.auth-icon {
+  width: 58px;
+  height: 58px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-bottom: 22px;
+
+  border-radius: 17px;
+
+  background: linear-gradient(
+    135deg,
+    #ffffff,
+    #c7d2fe
+  );
+
+  color: #111827;
+
+  font-size: 25px;
+  font-weight: 900;
+
+  box-shadow:
+    0 12px 30px rgba(99, 102, 241, 0.25);
+}
+
+/* Login page does not have auth-icon,
+   so create a visual top spacing */
+
+.auth-card > .tag {
+  margin-top: 2px;
+}
+
+/* Small heading */
+
+.auth-card .tag {
+  color: #a5b4fc;
+
+  font-size: 10px;
+  font-weight: 800;
+
+  letter-spacing: 1.8px;
+}
+
+/* Main heading */
+
+.auth-card h1 {
+  margin-top: 9px;
+
+  color: white;
+
+  font-size: 36px;
+  line-height: 1.15;
+
+  letter-spacing: -1.5px;
+  font-weight: 850;
+}
+
+/* Subtitle */
+
+.auth-subtitle {
+  margin-top: 12px;
+
+  color: #aeb8ca;
+
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* Form */
+
+.auth-card form {
+  margin-top: 28px;
+}
+
+/* Labels */
+
+.auth-card label {
+  display: block;
+
+  margin-bottom: 7px;
+
+  color: #d5dbea;
+
+  font-size: 11px;
+  font-weight: 750;
+}
+
+/* Inputs */
+
+.auth-card input {
+  width: 100%;
+
+  margin-bottom: 17px;
+
+  padding: 13px 14px;
+
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 11px;
+
+  outline: none;
+
+  background: rgba(255, 255, 255, 0.07);
+
+  color: white;
+
+  font-size: 13px;
+
+  transition: 0.2s ease;
+}
+
+.auth-card input::placeholder {
+  color: #7f8aa0;
+}
+
+.auth-card input:focus {
+  border-color: #818cf8;
+
+  background: rgba(255, 255, 255, 0.1);
+
+  box-shadow:
+    0 0 0 4px rgba(99, 102, 241, 0.12);
+
+  transform: translateY(-1px);
+}
+
+/* Submit button */
+
+.auth-card form button[type="submit"] {
+  width: 100%;
+
+  margin-top: 5px;
+
+  padding: 14px 18px;
+
+  border: none;
+  border-radius: 11px;
+
+  background: linear-gradient(
+    135deg,
+    #ffffff,
+    #dbeafe
+  );
+
+  color: #101525;
+
+  font-size: 13px;
+  font-weight: 800;
+
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.2);
+
+  transition: 0.25s ease;
+}
+
+.auth-card form button[type="submit"]:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 16px 35px rgba(0, 0, 0, 0.3);
+}
+
+.auth-card form button[type="submit"]:active {
+  transform: translateY(0);
+}
+
+/* Bottom text */
+
+.auth-footer {
+  margin-top: 24px;
+
+  padding-top: 20px;
+
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+
+  color: #8994a9;
+
+  font-size: 12px;
+
+  text-align: center;
+}
+
+/* Login / Register link */
+
+.auth-footer button {
+  border: none;
+
+  background: transparent;
+
+  color: #a5b4fc;
+
+  font-size: 12px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+.auth-footer button:hover {
+  color: white;
+  text-decoration: underline;
+}
+
+/* Mobile */
+
+@media (max-width: 520px) {
+  .auth-page {
+    padding: 25px 16px;
+  }
+
+  .auth-card {
+    padding: 32px 24px;
+
+    border-radius: 20px;
+  }
+
+  .auth-card h1 {
+    font-size: 30px;
+  }
+
+  .auth-subtitle {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .auth-card {
+    padding: 28px 19px;
+  }
+
+  .auth-card h1 {
+    font-size: 27px;
+  }
+}
