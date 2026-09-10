@@ -9,55 +9,53 @@ const commentRoutes = require("./routes/commentRoutes");
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Authentication routes
 app.use("/api/auth", authRoutes);
-
-// Blog post routes
 app.use("/api/posts", postRoutes);
-
-// Comment routes
 app.use("/api/comments", commentRoutes);
 
-// MongoDB connection
 mongoose.connection.on("connected", () => {
-  console.log("Mongoose connection: CONNECTED ✅");
+console.log("Mongoose connection: CONNECTED");
 });
 
 mongoose.connection.on("error", (error) => {
-  console.error("Mongoose connection ERROR ❌:", error.message);
+console.error("Mongoose connection ERROR:", error.message);
 });
 
 mongoose.connection.on("disconnected", () => {
-  console.log("Mongoose connection: DISCONNECTED ❌");
+console.log("Mongoose connection: DISCONNECTED");
 });
 
+const mongoURI = process.env.MONGO_URI;
+
+if (!mongoURI) {
+console.error("MONGO_URI is missing");
+} else {
 mongoose
-  .connect(process.env.MONGO_URI, {
-    serverSelectionTimeoutMS: 10000,
-  })
-  .then(() => {
-    console.log("MongoDB connected successfully ✅");
-  })
-  .catch((error) => {
-    console.error("MongoDB connection failed ❌");
-    console.error(error.message);
-  });
+.connect(mongoURI, {
+serverSelectionTimeoutMS: 10000,
+connectTimeoutMS: 10000,
+family: 4,
+})
+.then(() => {
+console.log("MongoDB connected successfully");
+})
+.catch((error) => {
+console.error("MongoDB connection failed");
+console.error(error.message);
+});
+}
 
-// Home route
 app.get("/", (req, res) => {
-  res.json({
-    message: "BlogSphere Backend API is running 🚀",
-  });
+res.json({
+message: "BlogSphere Backend API is running",
+});
 });
 
-// Port
 const PORT = process.env.PORT || 5000;
 
-// Start server
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
+console.log("Server running on port " + PORT);
 });

@@ -6,79 +6,104 @@ import "./App.css";
 
 function App() {
   const [page, setPage] = useState("home");
-
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    !!localStorage.getItem("token")
-  );
-
-  const [currentUser, setCurrentUser] = useState(() =>
-    JSON.parse(localStorage.getItem("user") || "null")
-  );
-
   const [posts, setPosts] = useState([]);
   const [comments, setComments] = useState({});
+  const [currentUser, setCurrentUser] = useState(null);
+
+  const [loading, setLoading] = useState(true);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
-  const [editingId, setEditingId] = useState(null);
+  const [editingPost, setEditingPost] = useState(null);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
 
   const [commentText, setCommentText] = useState({});
 
-  // =========================
-  // FETCH POSTS
-  // =========================
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+
+    if (storedUser) {
+      try {
+        setCurrentUser(JSON.parse(storedUser));
+      } catch {
+        localStorage.removeItem("user");
+      }
+    }
+
+    fetchPosts();
+  }, []);
+
   const fetchPosts = async () => {
     try {
+      setLoading(true);
+
       const response = await API.get("/posts");
 
-      const formattedPosts = response.data.map((post) => ({
-        ...post,
-        authorId: post.author?._id || post.author || null,
-        authorName: post.author?.name || "Unknown",
-      }));
+      const postData = Array.isArray(response.data)
+        ? response.data
+        : response.data.posts || [];
 
-      setPosts(formattedPosts);
+      setPosts(postData);
 
-      formattedPosts.forEach((post) => {
+      postData.forEach((post) => {
         fetchComments(post._id);
       });
     } catch (error) {
       console.error("Fetch posts error:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // =========================
-  // FETCH COMMENTS
-  // =========================
   const fetchComments = async (postId) => {
     try {
       const response = await API.get(`/comments/${postId}`);
 
+      const data = Array.isArray(response.data)
+        ? response.data
+        : response.data.comments || [];
+
       setComments((prev) => ({
         ...prev,
-        [postId]: response.data,
+        [postId]: data,
       }));
     } catch (error) {
       console.error("Fetch comments error:", error);
     }
   };
 
-  useEffect(() => {
-    fetchPosts();
-  }, []);
+  const handleLogin = () => {
+    const storedUser = localStorage.getItem("user");
 
-  // =========================
-  // CREATE POST
-  // =========================
-  const createPost = async (e) => {
+    if (storedUser) {
+      setCurrentUser(JSON.parse(storedUser));
+    }
+
+    setPage("home");
+    fetchPosts();
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    setCurrentUser(null);
+    setPage("home");
+
+    alert("Logged out successfully 👋");
+  };
+
+  const handleRegister = () => {
+    setPage("register");
+  };
+
+  const handleCreatePost = async (e) => {
     e.preventDefault();
 
-    if (!isLoggedIn) {
+    if (!currentUser) {
       alert("Please login first.");
-      setPage("login");
       return;
     }
 
@@ -88,33 +113,18 @@ function App() {
     }
 
     try {
-      const response = await API.post("/posts", {
-        title,
-        content,
+      await API.post("/posts", {
+        title: title.trim(),
+        content: content.trim(),
       });
-
-      const post = response.data.post;
-
-      const newPost = {
-        ...post,
-        authorId:
-          post.author?._id ||
-          post.author ||
-          currentUser?.id ||
-          null,
-        authorName:
-          post.author?.name ||
-          currentUser?.name ||
-          "Unknown",
-      };
-
-      setPosts((prev) => [newPost, ...prev]);
 
       setTitle("");
       setContent("");
+      setPage("home");
 
       alert("Post created successfully! 🎉");
-      setPage("blogs");
+
+      await fetchPosts();
     } catch (error) {
       console.error("Create post error:", error);
 
@@ -125,72 +135,45 @@ function App() {
     }
   };
 
-  // =========================
-  // START EDIT
-  // =========================
-  const startEdit = (post) => {
-    if (!isLoggedIn) {
-      alert("Please login first.");
-      setPage("login");
-      return;
-    }
-
-    const isOwner =
-      currentUser?.id &&
-      post.authorId &&
-      post.authorId.toString() === currentUser.id.toString();
-
-    if (!isOwner) {
-      alert("You can only edit your own posts.");
-      return;
-    }
-
-    setEditingId(post._id);
+  const startEditPost = (post) => {
+    setEditingPost(post._id);
     setEditTitle(post.title);
     setEditContent(post.content);
   };
 
-  // =========================
-  // SAVE EDIT
-  // =========================
-  const saveEdit = async (id) => {
+  const cancelEdit = () => {
+    setEditingPost(null);
+    setEditTitle("");
+    setEditContent("");
+  };
+
+  const updatePost = async (postId) => {
     if (!editTitle.trim() || !editContent.trim()) {
       alert("Title and content cannot be empty.");
       return;
     }
 
     try {
-      const response = await API.put(`/posts/${id}`, {
-        title: editTitle,
-        content: editContent,
+      await API.put(`/posts/${postId}`, {
+        title: editTitle.trim(),
+        content: editContent.trim(),
       });
-
-      const updatedPost = response.data.post;
 
       setPosts((prev) =>
         prev.map((post) =>
-          post._id === id
+          post._id === postId
             ? {
-                ...updatedPost,
-                authorId:
-                  updatedPost.author?._id ||
-                  updatedPost.author ||
-                  currentUser?.id ||
-                  null,
-                authorName:
-                  updatedPost.author?.name ||
-                  currentUser?.name ||
-                  "Unknown",
+                ...post,
+                title: editTitle.trim(),
+                content: editContent.trim(),
               }
             : post
         )
       );
 
-      setEditingId(null);
-      setEditTitle("");
-      setEditContent("");
+      cancelEdit();
 
-      alert("Post updated successfully! ✅");
+      alert("Post updated successfully! ✨");
     } catch (error) {
       console.error("Update post error:", error);
 
@@ -201,40 +184,23 @@ function App() {
     }
   };
 
-  // =========================
-  // DELETE POST
-  // =========================
-  const deletePost = async (id) => {
-    const post = posts.find((p) => p._id === id);
-
-    if (!post) return;
-
-    const isOwner =
-      currentUser?.id &&
-      post.authorId &&
-      post.authorId.toString() === currentUser.id.toString();
-
-    if (!isOwner) {
-      alert("You can only delete your own posts.");
-      return;
-    }
-
-    const confirmDelete = window.confirm(
+  const deletePost = async (postId) => {
+    const confirmed = window.confirm(
       "Are you sure you want to delete this post?"
     );
 
-    if (!confirmDelete) return;
+    if (!confirmed) return;
 
     try {
-      await API.delete(`/posts/${id}`);
+      await API.delete(`/posts/${postId}`);
 
       setPosts((prev) =>
-        prev.filter((post) => post._id !== id)
+        prev.filter((post) => post._id !== postId)
       );
 
       setComments((prev) => {
         const updated = { ...prev };
-        delete updated[id];
+        delete updated[postId];
         return updated;
       });
 
@@ -249,13 +215,9 @@ function App() {
     }
   };
 
-  // =========================
-  // ADD COMMENT
-  // =========================
   const addComment = async (postId) => {
-    if (!isLoggedIn) {
-      alert("Please login to comment.");
-      setPage("login");
+    if (!currentUser) {
+      alert("Please login first.");
       return;
     }
 
@@ -268,15 +230,18 @@ function App() {
 
     try {
       const response = await API.post("/comments", {
-        text,
-        post: postId,
+        postId,
+        content: text,
       });
+
+      const newComment =
+        response.data.comment || response.data;
 
       setComments((prev) => ({
         ...prev,
         [postId]: [
-          response.data.comment,
           ...(prev[postId] || []),
+          newComment,
         ],
       }));
 
@@ -294,41 +259,92 @@ function App() {
     }
   };
 
-  // =========================
-  // LOGOUT
-  // =========================
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+  const deleteComment = async (commentId, postId) => {
+    if (!currentUser) {
+      alert("Please login first.");
+      return;
+    }
 
-    setIsLoggedIn(false);
-    setCurrentUser(null);
-    setPage("home");
-
-    alert("Logged out successfully!");
-  };
-
-  // =========================
-  // LOGIN SUCCESS
-  // =========================
-  const handleLoginSuccess = () => {
-    const user = JSON.parse(
-      localStorage.getItem("user") || "null"
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this comment?"
     );
 
-    setCurrentUser(user);
-    setIsLoggedIn(true);
-    setPage("home");
+    if (!confirmed) return;
+
+    try {
+      await API.delete(`/comments/${commentId}`);
+
+      setComments((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] || []).filter(
+          (comment) => comment._id !== commentId
+        ),
+      }));
+
+      alert("Comment deleted successfully! 🗑️");
+    } catch (error) {
+      console.error("Delete comment error:", error);
+
+      alert(
+        error.response?.data?.message ||
+          "Failed to delete comment."
+      );
+    }
   };
 
-  // =========================
-  // AUTH PAGES
-  // =========================
+  const getAuthorName = (post) => {
+    if (post.author?.name) {
+      return post.author.name;
+    }
+
+    if (post.author?.email) {
+      return post.author.email;
+    }
+
+    return "BlogSphere Author";
+  };
+
+  const isPostOwner = (post) => {
+    if (!currentUser) return false;
+
+    const authorId =
+      post.author?._id ||
+      post.author ||
+      post.user?._id ||
+      post.user ||
+      null;
+
+    return String(authorId) === String(currentUser.id);
+  };
+
+  const isCommentOwner = (comment) => {
+    if (!currentUser) return false;
+
+    const authorId =
+      comment.author?._id ||
+      comment.author ||
+      comment.user?._id ||
+      comment.user ||
+      null;
+
+    return String(authorId) === String(currentUser.id);
+  };
+
+  const formatDate = (date) => {
+    if (!date) return "Recently";
+
+    return new Date(date).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
   if (page === "login") {
     return (
       <Login
-        onLogin={handleLoginSuccess}
-        onRegister={() => setPage("register")}
+        onLogin={handleLogin}
+        onRegister={handleRegister}
       />
     );
   }
@@ -342,239 +358,428 @@ function App() {
     );
   }
 
-  // =========================
-  // MAIN UI
-  // =========================
   return (
-    <div className="app">
+    <div className="app-shell">
 
       {/* NAVBAR */}
       <nav className="navbar">
+
         <div
-          className="logo"
+          className="brand"
           onClick={() => setPage("home")}
         >
-          BlogSphere
+          <div className="brand-logo">B</div>
+
+          <div>
+            <div className="brand-name">
+              BlogSphere
+            </div>
+
+            <div className="brand-subtitle">
+              Share • Create • Inspire
+            </div>
+          </div>
         </div>
 
         <div className="nav-links">
-          <button onClick={() => setPage("home")}>
+
+          <button
+            className={
+              page === "home"
+                ? "nav-link active"
+                : "nav-link"
+            }
+            onClick={() => setPage("home")}
+          >
             Home
           </button>
 
-          <button onClick={() => setPage("blogs")}>
-            Blogs
-          </button>
-
-          {isLoggedIn && (
-            <button onClick={() => setPage("create")}>
-              Create
+          {currentUser && (
+            <button
+              className="nav-link"
+              onClick={() => setPage("create")}
+            >
+              + Create Post
             </button>
           )}
 
-          {isLoggedIn ? (
-            <button onClick={handleLogout}>
-              Logout
-            </button>
+        </div>
+
+        <div className="nav-user">
+
+          {currentUser ? (
+            <>
+              <div className="user-pill">
+
+                <div className="user-avatar">
+                  {(currentUser.name || "U")
+                    .charAt(0)
+                    .toUpperCase()}
+                </div>
+
+                <span>
+                  {currentUser.name || "User"}
+                </span>
+
+              </div>
+
+              <button
+                className="logout-btn"
+                onClick={handleLogout}
+              >
+                Logout
+              </button>
+            </>
           ) : (
-            <button onClick={() => setPage("login")}>
-              Login
-            </button>
+            <>
+              <button
+                className="login-nav-btn"
+                onClick={() => setPage("login")}
+              >
+                Login
+              </button>
+
+              <button
+                className="signup-nav-btn"
+                onClick={() => setPage("register")}
+              >
+                Get Started
+              </button>
+            </>
           )}
+
         </div>
       </nav>
 
       {/* HOME */}
       {page === "home" && (
-        <main>
+        <>
+
+          {/* HERO */}
           <section className="hero">
-            <p className="tag">WELCOME TO BLOGSPHERE</p>
 
-            <h1>
-              Share your <span>stories.</span>
-            </h1>
+            <div className="hero-glow glow-one"></div>
+            <div className="hero-glow glow-two"></div>
 
-            <p>
-              A simple and beautiful platform where
-              everyone can write, share and discuss
-              ideas.
-            </p>
+            <div className="hero-content">
 
-            <div className="hero-buttons">
-              <button
-                onClick={() => setPage("blogs")}
-              >
-                Explore Blogs →
-              </button>
+              <div className="hero-badge">
+                ✦ WELCOME TO BLOGSPHERE
+              </div>
 
-              {isLoggedIn && (
-                <button
-                  onClick={() => setPage("create")}
-                >
-                  Write a Blog
-                </button>
-              )}
-            </div>
-          </section>
-        </main>
-      )}
-
-      {/* BLOGS */}
-      {page === "blogs" && (
-        <main className="blogs-page">
-
-          <div className="section-heading">
-            <p className="tag">COMMUNITY STORIES</p>
-
-            <h1>Latest Blogs</h1>
-
-            <p>
-              Discover stories and ideas shared by
-              our community.
-            </p>
-          </div>
-
-          {posts.length === 0 ? (
-            <div className="empty-state">
-              <h2>No blogs yet</h2>
+              <h1>
+                Your ideas.
+                <br />
+                <span>Your story.</span>
+              </h1>
 
               <p>
-                Be the first person to publish a blog.
+                A modern space to write, share and
+                connect with people through meaningful
+                stories.
               </p>
 
-              {isLoggedIn && (
+              <div className="hero-actions">
+
+                {currentUser ? (
+                  <button
+                    className="hero-primary"
+                    onClick={() => setPage("create")}
+                  >
+                    Start Writing →
+                  </button>
+                ) : (
+                  <button
+                    className="hero-primary"
+                    onClick={() => setPage("register")}
+                  >
+                    Join BlogSphere →
+                  </button>
+                )}
+
                 <button
+                  className="hero-secondary"
+                  onClick={() => {
+                    document
+                      .getElementById("posts")
+                      ?.scrollIntoView({
+                        behavior: "smooth",
+                      });
+                  }}
+                >
+                  Explore Posts
+                </button>
+
+              </div>
+            </div>
+
+            <div className="hero-decoration">
+
+              <div className="floating-card card-one">
+                <span>✍️</span>
+
+                <div>
+                  <strong>Create</strong>
+                  <small>Share your ideas</small>
+                </div>
+              </div>
+
+              <div className="floating-card card-two">
+                <span>💬</span>
+
+                <div>
+                  <strong>Connect</strong>
+                  <small>Join the conversation</small>
+                </div>
+              </div>
+
+              <div className="floating-card card-three">
+                <span>🚀</span>
+
+                <div>
+                  <strong>Inspire</strong>
+                  <small>Make an impact</small>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+          {/* POSTS */}
+          <section
+            className="posts-section"
+            id="posts"
+          >
+
+            <div className="section-heading">
+
+              <div>
+
+                <span className="section-label">
+                  COMMUNITY STORIES
+                </span>
+
+                <h2>Latest Posts</h2>
+
+                <p>
+                  Discover stories and ideas from the
+                  BlogSphere community.
+                </p>
+
+              </div>
+
+              {currentUser && (
+                <button
+                  className="create-small-btn"
                   onClick={() => setPage("create")}
                 >
-                  Create First Blog
+                  + Write a Post
                 </button>
               )}
+
             </div>
-          ) : (
-            <div className="posts-container">
 
-              {posts.map((post) => {
+            {loading ? (
+              <div className="loading-box">
 
-                const isOwner =
-                  currentUser?.id &&
-                  post.authorId &&
-                  post.authorId.toString() ===
-                    currentUser.id.toString();
+                <div className="loader"></div>
 
-                return (
+                <p>
+                  Loading stories...
+                </p>
+
+              </div>
+            ) : posts.length === 0 ? (
+
+              <div className="empty-state">
+
+                <div className="empty-icon">
+                  📝
+                </div>
+
+                <h3>No posts yet</h3>
+
+                <p>
+                  Be the first person to share a story
+                  with the community.
+                </p>
+
+                {currentUser && (
+                  <button
+                    className="hero-primary"
+                    onClick={() => setPage("create")}
+                  >
+                    Create First Post
+                  </button>
+                )}
+
+              </div>
+
+            ) : (
+
+              <div className="posts-grid">
+
+                {posts.map((post) => (
+
                   <article
-                    className="blog-card"
+                    className="post-card"
                     key={post._id}
                   >
 
-                    {editingId === post._id ? (
-                      <div className="edit-box">
+                    <div className="post-card-top"></div>
 
-                        <input
-                          value={editTitle}
-                          onChange={(e) =>
-                            setEditTitle(e.target.value)
-                          }
-                          placeholder="Blog title"
-                        />
+                    <div className="post-card-body">
 
-                        <textarea
-                          value={editContent}
-                          onChange={(e) =>
-                            setEditContent(e.target.value)
-                          }
-                          placeholder="Blog content"
-                          rows="8"
-                        />
+                      {/* POST META */}
+                      <div className="post-meta">
 
-                        <div className="post-actions">
+                        <div className="author-info">
 
-                          <button
-                            onClick={() =>
-                              saveEdit(post._id)
-                            }
-                          >
-                            Save Changes
-                          </button>
+                          <div className="author-avatar">
+                            {getAuthorName(post)
+                              .charAt(0)
+                              .toUpperCase()}
+                          </div>
 
-                          <button
-                            onClick={() =>
-                              setEditingId(null)
-                            }
-                          >
-                            Cancel
-                          </button>
+                          <div>
 
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <p className="blog-author">
-                          ✍️ {post.authorName}
-                        </p>
+                            <strong>
+                              {getAuthorName(post)}
+                            </strong>
 
-                        <h2>{post.title}</h2>
-
-                        <p className="blog-content">
-                          {post.content}
-                        </p>
-
-                        <div className="post-meta">
-                          {post.createdAt
-                            ? new Date(
+                            <span>
+                              {formatDate(
                                 post.createdAt
-                              ).toLocaleDateString()
-                            : ""}
+                              )}
+                            </span>
+
+                          </div>
+
                         </div>
 
-                        {/* EDIT / DELETE
-                            ONLY FOR OWNER */}
-                        {isOwner && (
-                          <div className="post-actions">
+                        <div className="post-tag">
+                          BLOG
+                        </div>
+
+                      </div>
+
+                      {/* EDIT / VIEW */}
+                      {editingPost === post._id ? (
+
+                        <div className="edit-box">
+
+                          <input
+                            value={editTitle}
+                            onChange={(e) =>
+                              setEditTitle(
+                                e.target.value
+                              )
+                            }
+                            placeholder="Post title"
+                          />
+
+                          <textarea
+                            value={editContent}
+                            onChange={(e) =>
+                              setEditContent(
+                                e.target.value
+                              )
+                            }
+                            placeholder="Post content"
+                            rows="7"
+                          />
+
+                          <div className="edit-actions">
 
                             <button
+                              className="save-btn"
                               onClick={() =>
-                                startEdit(post)
+                                updatePost(post._id)
                               }
                             >
-                              ✏️ Edit
+                              Save Changes
                             </button>
 
                             <button
-                              onClick={() =>
-                                deletePost(post._id)
-                              }
+                              className="cancel-btn"
+                              onClick={cancelEdit}
                             >
-                              🗑️ Delete
+                              Cancel
                             </button>
 
                           </div>
-                        )}
 
-                        {/* COMMENTS */}
-                        <div className="comments-section">
+                        </div>
 
-                          <h3>
-                            Comments (
-                            {comments[post._id]?.length ||
-                              0}
-                            )
+                      ) : (
+
+                        <>
+
+                          <h3 className="post-title">
+                            {post.title}
                           </h3>
 
-                          <div className="comment-input">
+                          <p className="post-content">
+                            {post.content}
+                          </p>
+
+                          {isPostOwner(post) && (
+                            <div className="post-owner-actions">
+
+                              <button
+                                className="edit-post-btn"
+                                onClick={() =>
+                                  startEditPost(post)
+                                }
+                              >
+                                ✏️ Edit
+                              </button>
+
+                              <button
+                                className="delete-post-btn"
+                                onClick={() =>
+                                  deletePost(
+                                    post._id
+                                  )
+                                }
+                              >
+                                🗑️ Delete
+                              </button>
+
+                            </div>
+                          )}
+
+                        </>
+
+                      )}
+
+                      {/* COMMENTS */}
+                      <div className="comments-section">
+
+                        <div className="comments-title">
+
+                          <span>
+                            💬 Comments
+                          </span>
+
+                          <span className="comment-count">
+                            {(comments[post._id] || [])
+                              .length}
+                          </span>
+
+                        </div>
+
+                        {currentUser && (
+                          <div className="comment-form">
 
                             <input
                               type="text"
-                              placeholder={
-                                isLoggedIn
-                                  ? "Write a comment..."
-                                  : "Login to comment..."
-                              }
+                              placeholder="Write a thoughtful comment..."
                               value={
-                                commentText[post._id] ||
-                                ""
+                                commentText[
+                                  post._id
+                                ] || ""
                               }
-                              disabled={!isLoggedIn}
                               onChange={(e) =>
                                 setCommentText(
                                   (prev) => ({
@@ -584,6 +789,17 @@ function App() {
                                   })
                                 )
                               }
+                              onKeyDown={(e) => {
+
+                                if (
+                                  e.key === "Enter"
+                                ) {
+                                  addComment(
+                                    post._id
+                                  );
+                                }
+
+                              }}
                             />
 
                             <button
@@ -591,108 +807,235 @@ function App() {
                                 addComment(post._id)
                               }
                             >
-                              Comment
+                              Send
                             </button>
 
                           </div>
+                        )}
 
-                          <div className="comments-list">
+                        {!currentUser && (
+                          <div className="login-comment-note">
 
-                            {comments[post._id]?.map(
-                              (comment) => (
-                                <div
-                                  className="comment"
-                                  key={comment._id}
-                                >
-                                  <strong>
-                                    {comment.author
-                                      ?.name ||
-                                      "User"}
-                                  </strong>
+                            <span>
+                              🔐 Login to join the
+                              conversation.
+                            </span>
 
-                                  <p>
-                                    {comment.text}
-                                  </p>
-                                </div>
-                              )
-                            )}
+                            <button
+                              onClick={() =>
+                                setPage("login")
+                              }
+                            >
+                              Login
+                            </button>
 
                           </div>
-                        </div>
-                      </>
-                    )}
+                        )}
 
+                        {/* COMMENT LIST */}
+                        <div className="comments-list">
+
+                          {(comments[post._id] || [])
+                            .length === 0 ? (
+
+                            <p className="no-comments">
+                              No comments yet. Be the
+                              first to comment!
+                            </p>
+
+                          ) : (
+
+                            (
+                              comments[post._id] || []
+                            ).map((comment) => (
+
+                              <div
+                                className="comment-item"
+                                key={comment._id}
+                              >
+
+                                <div className="comment-avatar">
+                                  {(
+                                    comment.author
+                                      ?.name ||
+                                    "U"
+                                  )
+                                    .charAt(0)
+                                    .toUpperCase()}
+                                </div>
+
+                                <div className="comment-main">
+
+                                  <div className="comment-header">
+
+                                    <div>
+
+                                      <strong>
+                                        {comment.author
+                                          ?.name ||
+                                          "User"}
+                                      </strong>
+
+                                      <span>
+                                        {formatDate(
+                                          comment.createdAt
+                                        )}
+                                      </span>
+
+                                    </div>
+
+                                    {isCommentOwner(
+                                      comment
+                                    ) && (
+
+                                      <button
+                                        className="delete-comment-btn"
+                                        onClick={() =>
+                                          deleteComment(
+                                            comment._id,
+                                            post._id
+                                          )
+                                        }
+                                        title="Delete your comment"
+                                      >
+                                        🗑️ Delete
+                                      </button>
+
+                                    )}
+
+                                  </div>
+
+                                  <p>
+                                    {comment.content}
+                                  </p>
+
+                                </div>
+
+                              </div>
+
+                            ))
+
+                          )}
+
+                        </div>
+
+                      </div>
+
+                    </div>
                   </article>
-                );
-              })}
+
+                ))}
+
+              </div>
+
+            )}
+
+          </section>
+
+          {/* FOOTER */}
+          <footer className="footer">
+
+            <div>
+
+              <strong>BlogSphere</strong>
+
+              <span>
+                Write. Share. Inspire.
+              </span>
 
             </div>
-          )}
-
-        </main>
-      )}
-
-      {/* CREATE */}
-      {page === "create" && (
-        <main className="create-page">
-
-          <div className="section-heading">
-            <p className="tag">CREATE</p>
-
-            <h1>Write a New Blog</h1>
 
             <p>
-              Share your thoughts with the BlogSphere
-              community.
+              © 2026 BlogSphere. Built with React,
+              Node.js & MongoDB.
             </p>
-          </div>
 
-          <form
-            className="create-form"
-            onSubmit={createPost}
-          >
+          </footer>
 
-            <label>Blog Title</label>
-
-            <input
-              type="text"
-              placeholder="Enter your blog title"
-              value={title}
-              onChange={(e) =>
-                setTitle(e.target.value)
-              }
-            />
-
-            <label>Content</label>
-
-            <textarea
-              rows="12"
-              placeholder="Write your story..."
-              value={content}
-              onChange={(e) =>
-                setContent(e.target.value)
-              }
-            />
-
-            <button type="submit">
-              Publish Blog →
-            </button>
-
-          </form>
-
-        </main>
+        </>
       )}
 
-      {/* FOOTER */}
-      <footer>
-        <h3>BlogSphere</h3>
+      {/* CREATE POST */}
+      {page === "create" && (
 
-        <p>Share. Connect. Inspire.</p>
+        <section className="create-page">
 
-        <p>
-          © 2026 BlogSphere. All rights reserved.
-        </p>
-      </footer>
+          <div className="create-wrapper">
+
+            <div className="create-header">
+
+              <span className="section-label">
+                CREATE SOMETHING GREAT
+              </span>
+
+              <h1>
+                Write a New Story
+              </h1>
+
+              <p>
+                Turn your thoughts into a story that
+                people can discover.
+              </p>
+
+            </div>
+
+            <form
+              className="create-form"
+              onSubmit={handleCreatePost}
+            >
+
+              <label>
+                Post Title
+              </label>
+
+              <input
+                type="text"
+                value={title}
+                onChange={(e) =>
+                  setTitle(e.target.value)
+                }
+                placeholder="Give your story a great title..."
+              />
+
+              <label>
+                Story Content
+              </label>
+
+              <textarea
+                rows="14"
+                value={content}
+                onChange={(e) =>
+                  setContent(e.target.value)
+                }
+                placeholder="Start writing your story..."
+              />
+
+              <div className="form-actions">
+
+                <button
+                  type="button"
+                  className="cancel-btn"
+                  onClick={() => setPage("home")}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="publish-btn"
+                >
+                  Publish Story →
+                </button>
+
+              </div>
+
+            </form>
+
+          </div>
+
+        </section>
+
+      )}
 
     </div>
   );
